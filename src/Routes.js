@@ -13,7 +13,7 @@ import Feed from './pages/Feed';
 const Routes = () => (
     <Container>
         <Route exact path="/" component={Home}/>
-        <Route path="/playlist/:playlistId" component={Playlist}/>
+        <Route path="/playlist/:uri" component={Playlist}/>
         <Route path="/feed/:userId?" component={Feed}/>
     </Container>
 );

@@ -18,7 +18,9 @@ class PlaylistsToWatch extends Component {
     }
 
     render () {
-        let a = this.state.list.map(i=><li key={i.playlistId}><Link to={`/playlist/${i.playlistId}`}>{i.playlistId}</Link></li>);
+        let a = this.state.list.map(i=>{
+            return(<li key={i.uri}><Link to={`/playlist/${i.uri}`}>{i.uri}</Link></li>);
+        });
         return(<div>
             Tracking playlists:
             <ul>{a}</ul>

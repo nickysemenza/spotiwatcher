@@ -33,25 +33,25 @@ module.exports.calculateDiffs = (event, context, callback) => {
         dynamoDb.scan({
             TableName: process.env.PLAYLIST_CONTENTS_TABLE
         }).promise().then((data)=>{
-            let byId = {};
+            let UriHash = {};
 
             data.Items.forEach(item=>{
-                if(!byId[item.playlistId])
-                    byId[item.playlistId] = [];
-                byId[item.playlistId].push(item);
+                if(!UriHash[item.uri])
+                    UriHash[item.uri] = [];
+                UriHash[item.uri].push(item);
             });
 
-            // console.log(byId);
+            // console.log(UriHash);
 
             let persistDiffPromises = [];
 
-            Object.keys(byId).forEach(function(playlistId) {
-                // console.log("aah",key, byId[key]);
+            Object.keys(UriHash).forEach(function(uri) {
+                // console.log("aah",key, UriHash[key]);
                 //sort new->old
-                byId[playlistId].sort(function(a,b) {return (a.timestamp < b.timestamp) ? 1 : ((b.timestamp < a.timestamp) ? -1 : 0);} );
+                UriHash[uri].sort(function(a,b) {return (a.timestamp < b.timestamp) ? 1 : ((b.timestamp < a.timestamp) ? -1 : 0);} );
 
 
-                let thisPlaylistVersionItem = byId[playlistId];
+                let thisPlaylistVersionItem = UriHash[uri];
                 for(let x=0; x < thisPlaylistVersionItem.length-1; x++) {
                     let newerItem = thisPlaylistVersionItem[x];
                     let olderItem = thisPlaylistVersionItem[x+1];
@@ -61,12 +61,13 @@ module.exports.calculateDiffs = (event, context, callback) => {
 
                     let { name }  = newerItem;
 
-                    console.log(`Comparing playlist ${playlistId} (${name}) newer@${newerItem.timestamp}: ${newer.length} items, older@${olderItem.timestamp}: ${older.length} items`);
+                    console.log(`Comparing playlist ${uri} (${name}) newer@${newerItem.timestamp}: ${newer.length} items, older@${olderItem.timestamp}: ${older.length} items`);
                     let onlyInNewer = newer.filter(comparer(older));
 
                     if(onlyInNewer.length > 0) {
                         //persist it
                         console.log('diff:',onlyInNewer);
+                        let { playlistId } = splitPlaylistURI(uri);
 
                         //create a hash out of uri Array to use has primary key
                         let uriHash = crypto.createHash('md5').update(onlyInNewer.map(d=>d.uri).join()).digest("hex");
@@ -78,6 +79,7 @@ module.exports.calculateDiffs = (event, context, callback) => {
                                     id: uriHash,
                                     diff: onlyInNewer,
                                     playlistId,
+                                    uri,
                                     name,
                                 }
                             }).promise().then(()=>resolveDBSave());
@@ -92,24 +94,29 @@ module.exports.calculateDiffs = (event, context, callback) => {
 
 
 /*
- * GET addPlaylist?playlistId=4Bni1YMfRtdwQ2jKIvv2lR&playlistUserId=14nicholasse&requesterUserId=nicky
+ * GET addPlaylist?uri=spotify:user:14nicholasse:playlist:4Bni1YMfRtdwQ2jKIvv2lR&requesterUserId=nicky
  * request that a playlist be added to the watchlist
  * TODO: auth headers
  */
 module.exports.addPlaylist = (event, context, callback) => {
 
-    let { playlistId, playlistUserId, requesterUserId } = event.queryStringParameters;
+    let { uri, requesterUserId } = event.queryStringParameters;
+
+    // let { playlistId, playlistUserId} = splitPlaylistURI(uri);
+
+    let uriUserHash = crypto.createHash('md5').update(uri+requesterUserId).digest("hex");
 
     dynamoDb.put({
         TableName: process.env.PLAYLISTS_TO_WATCH_TABLE,
         Item: {
-            id: uuid.v1(),
-            playlistUserId,
-            playlistId,
+            id: uriUserHash,
+            // playlistUserId,
+            // playlistId,
             requesterUserId,
+            uri,
         },
     }).promise().then((d)=>{
-        console.log(`added to watchlist: ${playlistId}`);
+        console.log(`added to watchlist: ${uri}`);
         callback(null, {
             statusCode: 200,
             body: JSON.stringify({
@@ -134,24 +141,23 @@ module.exports.userFeed = (event, context, callback) => {
         let uniq = {};
         let feed = [];
         watching.forEach(p=>{
-            let {playlistId, playlistUserId} = p;
-            uniq[playlistId] = playlistUserId;
+            let {uri} = p;
+            uniq[uri] = uri;
         });
-        // console.log("uniq",uniq);
 
-        let playlistIds = Object.keys(uniq);
-        // console.log(playlistIds);
+        let uris = Object.keys(uniq);
         dynamoDb.scan({
             TableName: process.env.PLAYLIST_DIFFS_TABLE,
             ExpressionAttributeValues: {
-                ":value": playlistIds
+                ":value": uris
             },
-            FilterExpression: "contains(:value, playlistId)"
+            FilterExpression: "contains(:value, uri)"
         }).promise().then(a => {
             let res = a.Items;
             res.forEach(x=>{
                 x.diff.forEach(thisDiffItem=> {
-                    thisDiffItem.playlistId = x.playlistId;
+                    thisDiffItem.playlistId = splitPlaylistURI(x.uri).playlistId;
+                    thisDiffItem.uri = x.uri;
                     thisDiffItem.playlistName = x.name;
                     feed.push(thisDiffItem);
                 })
@@ -227,15 +233,15 @@ module.exports.fetchAllPlaylists = (event, context, callback) => {
     dynamoDb.scan({
         TableName: process.env.PLAYLISTS_TO_WATCH_TABLE
     }).promise().then((data)=>{
-        let promises = data.Items.map((item)=>fetchPlaylist(item.playlistUserId, item.playlistId));
+        let promises = data.Items.map((item)=>fetchPlaylist(item.uri));
         Promise.all(promises).then((res)=>{
-            // console.log('done all',res);
+            console.log('done all',res);
             callback(null, res)
         })
     });
 };
 
-function fetchPlaylist(playlistUserId, playlistId) {
+function fetchPlaylist(uri) {
     return new Promise((resolve, reject) => {
         let spotifyApi = new SpotifyWebApi({
             clientId : process.env.SPOTIFY_CLIENT_ID,
@@ -248,8 +254,8 @@ function fetchPlaylist(playlistUserId, playlistId) {
                 console.log('> The access token is ' + data.body['access_token']);
                 spotifyApi.setAccessToken(data.body['access_token']);
 
-                fetchPlaylistIfNecessary(playlistUserId, playlistId, spotifyApi).then((fetched)=>{
-                    resolve({fetched, playlistUserId, playlistId});
+                fetchPlaylistIfNecessary(uri, spotifyApi).then((fetched)=>{
+                    resolve({fetched, uri});
                 });
 
             }, function(err) {
@@ -301,14 +307,15 @@ function doesSnapshotIdAlreadyExist(snapshotId) {
     })
 }
 
-function fetchPlaylistIfNecessary(playlistUserId, playlistId, spotifyApi) {
+function fetchPlaylistIfNecessary(uri, spotifyApi) {
     return new Promise((resolve, reject) => {
+        let { playlistUserId, playlistId } = splitPlaylistURI(uri);
         getPlaylistInfo(playlistUserId, playlistId, spotifyApi).then((playlistInfo)=>{
             // console.log(playlistInfo);
             let { snapshotId, name } = playlistInfo;
             doesSnapshotIdAlreadyExist(snapshotId).then(snapshotExists => {
                 if(snapshotExists) {
-                    console.log(`fetchPlaylistIfNecessary: ${playlistId} - current snapshot (${snapshotId}) exists in DB`);
+                    console.log(`fetchPlaylistIfNecessary: ${uri} - current snapshot (${snapshotId}) exists in DB`);
                     resolve({didFetch: false, name});
                 } else {
                     getPlaylistTracks(playlistUserId, playlistId, spotifyApi).then((data)=>{
@@ -322,9 +329,8 @@ function fetchPlaylistIfNecessary(playlistUserId, playlistId, spotifyApi) {
                         dynamoDb.put({
                             TableName: process.env.PLAYLIST_CONTENTS_TABLE,
                             Item: {
-                                id: uuid.v1(),
-                                playlistUserId,
-                                playlistId,
+                                id: snapshotId,
+                                uri,
                                 snapshotId,
                                 contents,
                                 timestamp,
@@ -332,7 +338,7 @@ function fetchPlaylistIfNecessary(playlistUserId, playlistId, spotifyApi) {
                             },
                         }).promise().then(()=>{
                             let count = data.length;
-                            console.log(`fetchPlaylistIfNecessary: ${playlistId} - fetched snapshot (${snapshotId}) - ${count} tracks`);
+                            console.log(`fetchPlaylistIfNecessary: ${uri} - fetched snapshot (${snapshotId}) - ${count} tracks`);
                             resolve({didFetch: true, count, name})
                         })
                     })
@@ -391,5 +397,12 @@ function getResponseObject(data) {
         statusCode: 200,
         headers: { "Access-Control-Allow-Origin" : "*" },
         body: JSON.stringify(data),
+    }
+}
+function splitPlaylistURI(playlistURI) {
+    let s = playlistURI.split(':');
+    return {
+        playlistId: s[4],
+        playlistUserId: s[2]
     }
 }
