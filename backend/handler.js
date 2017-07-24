@@ -59,7 +59,9 @@ module.exports.calculateDiffs = (event, context, callback) => {
                     let newer = newerItem.contents;
                     let older = olderItem.contents;
 
-                    console.log(`Comparing playlist ${playlistId} newer@${newerItem.timestamp}: ${newer.length} items, older@${olderItem.timestamp}: ${older.length} items`);
+                    let { name }  = newerItem;
+
+                    console.log(`Comparing playlist ${playlistId} (${name}) newer@${newerItem.timestamp}: ${newer.length} items, older@${olderItem.timestamp}: ${older.length} items`);
                     let onlyInNewer = newer.filter(comparer(older));
 
                     if(onlyInNewer.length > 0) {
@@ -75,7 +77,8 @@ module.exports.calculateDiffs = (event, context, callback) => {
                                 Item: {
                                     id: uriHash,
                                     diff: onlyInNewer,
-                                    playlistId
+                                    playlistId,
+                                    name,
                                 }
                             }).promise().then(()=>resolveDBSave());
                         }));
@@ -149,7 +152,7 @@ module.exports.userFeed = (event, context, callback) => {
             res.forEach(x=>{
                 x.diff.forEach(thisDiffItem=> {
                     thisDiffItem.playlistId = x.playlistId;
-                    // thisDiff.playlistName = x.playlistName;
+                    thisDiffItem.playlistName = x.name;
                     feed.push(thisDiffItem);
                 })
             });
@@ -199,15 +202,9 @@ module.exports.getPlaylist = (event, context, callback) => {
         },
         FilterExpression: "playlistId = :value"
     }).promise().then((diffData)=>{
-        callback(null, {
-            statusCode: 200,
-            headers: {
-                "Access-Control-Allow-Origin" : "*" // Required for CORS support to work
-            },
-            body: JSON.stringify({
-                diffs: diffData.Items
-            }),
-        })
+        callback(null, getResponseObject({
+            diffs: diffData.Items
+        }));
     });
 };
 
@@ -216,14 +213,8 @@ module.exports.getPlaylist = (event, context, callback) => {
  */
 module.exports.getWatchingPlaylists = (event, context, callback) => {
 
-    dynamoDb.scan({
-        TableName: process.env.PLAYLISTS_TO_WATCH_TABLE
-    }).promise().then((data)=>{
-        callback(null, {
-            statusCode: 200,
-            headers: { "Access-Control-Allow-Origin" : "*" },
-            body: JSON.stringify(data.Items),
-        })
+    getUserPlaylists().then((data)=>{
+        callback(null, getResponseObject(data));
     });
 };
 
@@ -314,11 +305,11 @@ function fetchPlaylistIfNecessary(playlistUserId, playlistId, spotifyApi) {
     return new Promise((resolve, reject) => {
         getPlaylistInfo(playlistUserId, playlistId, spotifyApi).then((playlistInfo)=>{
             // console.log(playlistInfo);
-            let { snapshotId } = playlistInfo;
+            let { snapshotId, name } = playlistInfo;
             doesSnapshotIdAlreadyExist(snapshotId).then(snapshotExists => {
                 if(snapshotExists) {
                     console.log(`fetchPlaylistIfNecessary: ${playlistId} - current snapshot (${snapshotId}) exists in DB`);
-                    resolve({didFetch: false});
+                    resolve({didFetch: false, name});
                 } else {
                     getPlaylistTracks(playlistUserId, playlistId, spotifyApi).then((data)=>{
                         let contents = data.map((e)=>({
@@ -336,12 +327,13 @@ function fetchPlaylistIfNecessary(playlistUserId, playlistId, spotifyApi) {
                                 playlistId,
                                 snapshotId,
                                 contents,
-                                timestamp
+                                timestamp,
+                                name
                             },
                         }).promise().then(()=>{
                             let count = data.length;
                             console.log(`fetchPlaylistIfNecessary: ${playlistId} - fetched snapshot (${snapshotId}) - ${count} tracks`);
-                            resolve({didFetch: true, count})
+                            resolve({didFetch: true, count, name})
                         })
                     })
                 }
@@ -393,4 +385,11 @@ function getPlaylistTracks(userId, playlistId, apiClient) {
         };
         return goFetch(0);
     })
+}
+function getResponseObject(data) {
+    return {
+        statusCode: 200,
+        headers: { "Access-Control-Allow-Origin" : "*" },
+        body: JSON.stringify(data),
+    }
 }
