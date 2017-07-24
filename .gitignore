@@ -23,3 +23,6 @@ yarn-error.log*
 
 # Serverless directories
 .serverless
+
+keys.yml
+backend/node_modules

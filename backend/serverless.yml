@@ -1,0 +1,136 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: spotiwatcher
+
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+# frameworkVersion: "=X.X.X"
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  environment:
+      PLAYLIST_CONTENTS_TABLE: spotiwatcher-playlist-contents${opt:stage, self:provider.stage}
+      PLAYLISTS_TO_WATCH_TABLE: spotiwatcher-playlists-to-watch-${opt:stage, self:provider.stage}
+      PLAYLIST_DIFFS_TABLE: spotiwatcher-playlist-diffs-${opt:stage, self:provider.stage}
+      SPOTIFY_CLIENT_ID: ${file(./keys.yml):SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${file(./keys.yml):SPOTIFY_CLIENT_SECRET}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+      Resource: "*"
+
+functions:
+#  test:
+#    handler: handler.test
+#  hello:
+#    handler: handler.hello
+#    events:
+#      - http: GET hello
+#        cors: true
+  diff:
+    handler: handler.calculateDiffs
+#    - schedule: rate(20 minutes)
+  fetch:
+    handler: handler.fetchAllPlaylists
+#    - schedule: rate(20 minutes)
+  watching:
+      handler: handler.getWatchingPlaylists
+      events:
+        - http: GET playlists/watching
+          cors: true
+  feed:
+      handler: handler.userFeed
+      events:
+        - http: GET feed
+          cors: true
+  getPlaylist:
+      handler: handler.getPlaylist
+      events:
+        - http: GET playlists
+        - http: OPTIONS playlists
+          cors: true
+  addPlaylist:
+      handler: handler.addPlaylist
+      events:
+        - http: GET addPlaylist
+        - http: OPTIONS addPlaylist
+        - http: PUT addPlaylist
+          cors: true
+
+# you can add CloudFormation resource templates here
+#resources:
+#  Resources:
+#    PlaylistContentsDynamoDbTable:
+#      Type: 'AWS::DynamoDB::Table'
+#      DeletionPolicy: Retain
+#      Properties:
+#        AttributeDefinitions:
+#          -
+#            AttributeName: "id"
+#            AttributeType: "S"
+#        KeySchema:
+#          -
+#            AttributeName: "id"
+#            KeyType: "HASH"
+#        ProvisionedThroughput:
+#          ReadCapacityUnits: 1
+#          WriteCapacityUnits: 1
+#        StreamSpecification:
+#          StreamViewType: "NEW_AND_OLD_IMAGES"
+#        TableName: ${self:provider.environment.PLAYLIST_CONTENTS_TABLE}
+#    PlaylistsToWatchDynamoDbTable:
+#      Type: 'AWS::DynamoDB::Table'
+#      DeletionPolicy: Retain
+#      Properties:
+#        AttributeDefinitions:
+#          -
+#            AttributeName: "id"
+#            AttributeType: "S"
+#        KeySchema:
+#          -
+#            AttributeName: "id"
+#            KeyType: "HASH"
+#        ProvisionedThroughput:
+#          ReadCapacityUnits: 1
+#          WriteCapacityUnits: 1
+#        StreamSpecification:
+#          StreamViewType: "NEW_AND_OLD_IMAGES"
+#        TableName: ${self:provider.environment.PLAYLISTS_TO_WATCH_TABLE}
+#    PlaylistDiffsDynamoDbTable:
+#      Type: 'AWS::DynamoDB::Table'
+#      DeletionPolicy: Retain
+#      Properties:
+#        AttributeDefinitions:
+#          -
+#            AttributeName: "id"
+#            AttributeType: "S"
+#        KeySchema:
+#          -
+#            AttributeName: "id"
+#            KeyType: "HASH"
+#        ProvisionedThroughput:
+#          ReadCapacityUnits: 1
+#          WriteCapacityUnits: 1
+#        StreamSpecification:
+#          StreamViewType: "NEW_AND_OLD_IMAGES"
+#        TableName: ${self:provider.environment.PLAYLIST_DIFFS_TABLE}
+#  Outputs:
+#     NewOutput:
+#       Description: "Description for the output"
+#       Value: "Some output value"
