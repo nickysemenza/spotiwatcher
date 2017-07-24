@@ -4,7 +4,7 @@ provider:
   name: aws
   runtime: nodejs6.10
   environment:
-      PLAYLIST_CONTENTS_TABLE: spotiwatcher-playlist-contents${opt:stage, self:provider.stage}
+      PLAYLIST_CONTENTS_TABLE: spotiwatcher-playlist-contents-${opt:stage, self:provider.stage}
       PLAYLISTS_TO_WATCH_TABLE: spotiwatcher-playlists-to-watch-${opt:stage, self:provider.stage}
       PLAYLIST_DIFFS_TABLE: spotiwatcher-playlist-diffs-${opt:stage, self:provider.stage}
       SPOTIFY_CLIENT_ID: ${file(./keys.yml):SPOTIFY_CLIENT_ID}
@@ -17,15 +17,7 @@ provider:
         - dynamodb:GetItem
         - dynamodb:PutItem
       Resource: "*"
-
 functions:
-#  test:
-#    handler: handler.test
-#  hello:
-#    handler: handler.hello
-#    events:
-#      - http: GET hello
-#        cors: true
   diff:
     handler: handler.calculateDiffs
 #    - schedule: rate(20 minutes)
@@ -57,63 +49,59 @@ functions:
           cors: true
 
 # you can add CloudFormation resource templates here
-#resources:
-#  Resources:
-#    PlaylistContentsDynamoDbTable:
-#      Type: 'AWS::DynamoDB::Table'
-#      DeletionPolicy: Retain
-#      Properties:
-#        AttributeDefinitions:
-#          -
-#            AttributeName: "id"
-#            AttributeType: "S"
-#        KeySchema:
-#          -
-#            AttributeName: "id"
-#            KeyType: "HASH"
-#        ProvisionedThroughput:
-#          ReadCapacityUnits: 1
-#          WriteCapacityUnits: 1
-#        StreamSpecification:
-#          StreamViewType: "NEW_AND_OLD_IMAGES"
-#        TableName: ${self:provider.environment.PLAYLIST_CONTENTS_TABLE}
-#    PlaylistsToWatchDynamoDbTable:
-#      Type: 'AWS::DynamoDB::Table'
-#      DeletionPolicy: Retain
-#      Properties:
-#        AttributeDefinitions:
-#          -
-#            AttributeName: "id"
-#            AttributeType: "S"
-#        KeySchema:
-#          -
-#            AttributeName: "id"
-#            KeyType: "HASH"
-#        ProvisionedThroughput:
-#          ReadCapacityUnits: 1
-#          WriteCapacityUnits: 1
-#        StreamSpecification:
-#          StreamViewType: "NEW_AND_OLD_IMAGES"
-#        TableName: ${self:provider.environment.PLAYLISTS_TO_WATCH_TABLE}
-#    PlaylistDiffsDynamoDbTable:
-#      Type: 'AWS::DynamoDB::Table'
-#      DeletionPolicy: Retain
-#      Properties:
-#        AttributeDefinitions:
-#          -
-#            AttributeName: "id"
-#            AttributeType: "S"
-#        KeySchema:
-#          -
-#            AttributeName: "id"
-#            KeyType: "HASH"
-#        ProvisionedThroughput:
-#          ReadCapacityUnits: 1
-#          WriteCapacityUnits: 1
-#        StreamSpecification:
-#          StreamViewType: "NEW_AND_OLD_IMAGES"
-#        TableName: ${self:provider.environment.PLAYLIST_DIFFS_TABLE}
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"
+resources:
+  Resources:
+    PlaylistContentsDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "id"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "id"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: "NEW_AND_OLD_IMAGES"
+        TableName: ${self:provider.environment.PLAYLIST_CONTENTS_TABLE}
+    PlaylistsToWatchDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "id"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "id"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: "NEW_AND_OLD_IMAGES"
+        TableName: ${self:provider.environment.PLAYLISTS_TO_WATCH_TABLE}
+    PlaylistDiffsDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "id"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "id"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: "NEW_AND_OLD_IMAGES"
+        TableName: ${self:provider.environment.PLAYLIST_DIFFS_TABLE}

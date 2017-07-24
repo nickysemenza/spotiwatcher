@@ -6,17 +6,6 @@ const dynamoDb = new AWS.DynamoDB.DocumentClient();
 const uuid = require('uuid');
 const crypto = require('crypto');
 
-module.exports.hello = (event, context, callback) => {
-  const response = {
-    statusCode: 200,
-    body: JSON.stringify({
-      message: 'Go Serverless v1.0! Your function executed successfully!',
-      event,
-      context
-    }),
-  };
-  callback(null, response);
-};
 
 function comparer(otherArray){
     return current => otherArray.filter(other => other.uri === current.uri).length === 0
@@ -267,32 +256,9 @@ function fetchPlaylist(uri) {
     })
 }
 
-// module.exports.test = (event, context, callback) => {
-//     let spotifyApi = new SpotifyWebApi({
-//         clientId : process.env.SPOTIFY_CLIENT_ID,
-//         clientSecret : process.env.SPOTIFY_CLIENT_SECRET,
-//     });
-//
-//     const playlistUserId = 'prxmusic';
-//     const playlistId = '3VEFRGe3APwGRl4eTpMS4x';
-//
-// // Retrieve an access token
-//     spotifyApi.clientCredentialsGrant()
-//         .then(function(data) {
-//             console.log('> The access token expires in ' + data.body['expires_in']);
-//             console.log('> The access token is ' + data.body['access_token']);
-//             spotifyApi.setAccessToken(data.body['access_token']);
-//
-//             fetchPlaylistIfNecessary(playlistUserId, playlistId, spotifyApi).then((fetched)=>{
-//                 console.log('done!',fetched);
-//                 callback(null, { message: 'yay', event });
-//             });
-//
-//         }, function(err) {
-//             console.log('Something went wrong when retrieving an access token', err.message);
-//         });
-// };
-
+/*
+ * Checks to see if we already have a playlist @snapshotId
+ */
 function doesSnapshotIdAlreadyExist(snapshotId) {
     return new Promise((resolve, reject) => {
         dynamoDb.scan({
@@ -307,6 +273,9 @@ function doesSnapshotIdAlreadyExist(snapshotId) {
     })
 }
 
+/*
+ * Fetches the latest version of a playlist (if necessary)
+ */
 function fetchPlaylistIfNecessary(uri, spotifyApi) {
     return new Promise((resolve, reject) => {
         let { playlistUserId, playlistId } = splitPlaylistURI(uri);
@@ -348,6 +317,9 @@ function fetchPlaylistIfNecessary(uri, spotifyApi) {
     })
 }
 
+/*
+ * gets info about a play list (no tracks incl.)
+ */
 function getPlaylistInfo(userId, playlistId, apiClient) {
     return new Promise((resolve, reject) => {
         apiClient.getPlaylist(userId, playlistId)
@@ -369,6 +341,10 @@ function getPlaylistInfo(userId, playlistId, apiClient) {
     })
 }
 
+/*
+ * Gets tracks for a playlist
+ *  (recursively)
+ */
 function getPlaylistTracks(userId, playlistId, apiClient) {
     return new Promise((resolve, reject) => {
         let tracks = [];
@@ -392,6 +368,9 @@ function getPlaylistTracks(userId, playlistId, apiClient) {
         return goFetch(0);
     })
 }
+/*
+ * Prepares a response object
+ */
 function getResponseObject(data) {
     return {
         statusCode: 200,
@@ -399,6 +378,9 @@ function getResponseObject(data) {
         body: JSON.stringify(data),
     }
 }
+/*
+ * Splits a URI into its components
+ */
 function splitPlaylistURI(playlistURI) {
     let s = playlistURI.split(':');
     return {
