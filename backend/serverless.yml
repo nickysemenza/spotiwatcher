@@ -20,10 +20,12 @@ provider:
 functions:
   diff:
     handler: handler.calculateDiffs
-#    - schedule: rate(20 minutes)
+    events:
+    - schedule: rate(15 minutes)
   fetch:
     handler: handler.fetchAllPlaylists
-#    - schedule: rate(20 minutes)
+    events:
+    - schedule: rate(30 minutes)
   watching:
       handler: handler.getWatchingPlaylists
       events:

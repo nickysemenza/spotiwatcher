@@ -6,10 +6,21 @@ import SpotifyWidget from "../components/SpotifyWidget";
 class Playlist extends Component {
     constructor (props) {
         super(props);
-        this.state = { feed: [] };
+        this.state = { feed: [], uriInput: ""};
+        this.handleChange = this.handleChange.bind(this);
+        this.handleSubmit = this.handleSubmit.bind(this);
     }
     componentDidMount() {
         this.fetchData(this.getUserId());
+    }
+    handleChange(event) {
+        this.setState({uriInput: event.target.value});
+    }
+    handleSubmit(event) {
+        event.preventDefault();
+        let user = this.getUserId();
+        apiFetch(`addPlaylist?uri=${this.state.uriInput}&requesterUserId=${user}`)
+            .then((response) => response.json()).then((json) => console.log(json));
     }
 
     fetchData(user) {
@@ -39,6 +50,14 @@ class Playlist extends Component {
             <h1>Viewing Feed for {userId}</h1>
             <h2>Diffs</h2>
             <ul>{diffList}</ul>
+            {userId !== null ?
+                <form onSubmit={this.handleSubmit}>
+                    <label>
+                        URI (e.g. spotify:user:14nicholasse:playlist:4Bni1YMfRtdwQ2jKIvv2lR):
+                        <input type="text" value={this.state.uriInput} onChange={this.handleChange} />
+                    </label>
+                    <input type="submit" value="Submit" />
+                </form> : null}
         </div>)
     }
 }

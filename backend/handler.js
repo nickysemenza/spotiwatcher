@@ -91,30 +91,18 @@ module.exports.addPlaylist = (event, context, callback) => {
 
     let { uri, requesterUserId } = event.queryStringParameters;
 
-    // let { playlistId, playlistUserId} = splitPlaylistURI(uri);
-
     let uriUserHash = crypto.createHash('md5').update(uri+requesterUserId).digest("hex");
 
     dynamoDb.put({
         TableName: process.env.PLAYLISTS_TO_WATCH_TABLE,
         Item: {
             id: uriUserHash,
-            // playlistUserId,
-            // playlistId,
             requesterUserId,
             uri,
         },
     }).promise().then((d)=>{
         console.log(`added to watchlist: ${uri}`);
-        callback(null, {
-            statusCode: 200,
-            body: JSON.stringify({
-                message: 'Added to watchlist!',
-                event,
-                context,
-                d
-            }),
-        })
+        callback(null, getResponseObject({'message': `added ${uri} to watchlist for ${requesterUserId}`}));
     });
 };
 
@@ -273,6 +261,17 @@ function doesSnapshotIdAlreadyExist(snapshotId) {
     })
 }
 
+function removeEmptyStringElements(obj) {
+    for (let prop in obj) {
+        if (typeof obj[prop] === 'object') {// dive deeper in
+            removeEmptyStringElements(obj[prop]);
+        } else if(obj[prop] === '') {// delete elements that are empty strings
+            obj[prop] = 'err';
+        }
+    }
+    return obj;
+}
+
 /*
  * Fetches the latest version of a playlist (if necessary)
  */
@@ -295,16 +294,18 @@ function fetchPlaylistIfNecessary(uri, spotifyApi) {
                             artists: e.track.artists.map((a)=>a.name)
                         }));
                         let timestamp = new Date().getTime();
+                        let Item = removeEmptyStringElements({
+                            id: snapshotId,
+                            uri,
+                            snapshotId,
+                            contents,
+                            timestamp,
+                            name
+                        });
+                        // console.log("SAVING",Item);
                         dynamoDb.put({
                             TableName: process.env.PLAYLIST_CONTENTS_TABLE,
-                            Item: {
-                                id: snapshotId,
-                                uri,
-                                snapshotId,
-                                contents,
-                                timestamp,
-                                name
-                            },
+                            Item,
                         }).promise().then(()=>{
                             let count = data.length;
                             console.log(`fetchPlaylistIfNecessary: ${uri} - fetched snapshot (${snapshotId}) - ${count} tracks`);
