@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import apiFetch from '../utils';
 import {Link} from "react-router-dom";
 import SpotifyWidget from "../components/SpotifyWidget";
+import moment from 'moment';
 
 class Playlist extends Component {
     constructor (props) {
@@ -39,13 +40,14 @@ class Playlist extends Component {
 
     render () {
         let userId = this.getUserId();
-        let diffList = this.state.feed.map(feedItem=>
-            <li key={feedItem.added_at}>
-                added at {feedItem.added_at} to <Link to={`/playlist/${feedItem.uri}`}>{feedItem.playlistName} [{feedItem.uri}]</Link>
+        let diffList = this.state.feed.map(feedItem=>{
+            let m = moment(feedItem.added_at);
+            return (<li key={feedItem.feedItemHash}>
+                added  {m.fromNow()} to <Link to={`/playlist/${feedItem.playlistUri}`}>{feedItem.playlistName} [{feedItem.playlistUri}]</Link>
                 <br/>
                 <SpotifyWidget uri={feedItem.uri} />
-            </li>
-        );
+            </li>)
+            });
         return(<div>
             <h1>Viewing Feed for {userId}</h1>
             <h2>Diffs</h2>

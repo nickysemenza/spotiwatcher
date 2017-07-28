@@ -4,6 +4,7 @@ const AWS = require('aws-sdk');
 AWS.config.setPromisesDependency(require('bluebird'));
 const dynamoDb = new AWS.DynamoDB.DocumentClient();
 const uuid = require('uuid');
+const moment = require('moment');
 const crypto = require('crypto');
 
 
@@ -117,6 +118,7 @@ module.exports.userFeed = (event, context, callback) => {
     getUserPlaylists(requesterUserId).then(watching=>{
         let uniq = {};
         let feed = [];
+        let feedHashes = [];
         watching.forEach(p=>{
             let {uri} = p;
             uniq[uri] = uri;
@@ -133,13 +135,24 @@ module.exports.userFeed = (event, context, callback) => {
             let res = a.Items;
             res.forEach(x=>{
                 x.diff.forEach(thisDiffItem=> {
+                    let feedItemHash = thisDiffItem.uri+"|"+x.uri;//song uri + playlist uri should be uniq
                     thisDiffItem.playlistId = splitPlaylistURI(x.uri).playlistId;
-                    thisDiffItem.uri = x.uri;
+                    thisDiffItem.playlistUri = x.uri;
                     thisDiffItem.playlistName = x.name;
-                    feed.push(thisDiffItem);
+                    thisDiffItem.feedItemHash = feedItemHash;
+                    if(!feedHashes.includes(feedItemHash)) {
+                        feed.push(thisDiffItem);
+                        feedHashes.push(feedItemHash);
+                    }
                 })
             });
+
+            //sort results new -> old
+            feed.sort(function (x, y) {
+                return moment.utc(y.added_at).diff(moment.utc(x.added_at))
+            });
             console.log("FEED",feed);
+
             callback(null, {
                 statusCode: 200,
                 headers: { "Access-Control-Allow-Origin" : "*" },
